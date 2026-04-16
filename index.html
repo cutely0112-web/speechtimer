@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>발표 시간 계산기 - 쉰바이브 커스텀</title>
+  <script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <style>
+    /* Paperlogy 5 Medium 폰트 */
+    @font-face {
+        font-family: 'Paperlogy-5Medium';
+        src: url('https://fastly.jsdelivr.net/gh/projectnoonnu/2412@1.0/Paperlogy-5Medium.woff2') format('woff2');
+        font-weight: 500;
+        font-style: normal;
+    }
+
+    :root { 
+      --main-font: 'Paperlogy-5Medium', sans-serif; 
+      --accent-color: #e65100; 
+      --bg-orange: #fef3e2;
+      --border-orange: #ffd180;
+    }
+
+    body { 
+      margin: 0; 
+      font-family: var(--main-font); 
+      background: #eef3fa; 
+      color: #333;
+    }
+    
+    .container { width: 100%; max-width: 1300px; margin: auto; padding: 30px; }
+
+    /* 상단 헤더 영역 - 높이 및 크기 확장 */
+    .header-row { 
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center; 
+      margin-bottom: 30px; 
+      background: white;
+      padding: 25px 40px; /* 패딩 증가로 높이 확보 */
+      border-radius: 15px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+
+    .title-group { display: flex; align-items: center; gap: 20px; }
+    .title-logo { height: 50px; cursor: pointer; } /* 로고 크기 확대 */
+    h1 { font-size: 32px; font-weight: bold; margin: 0; color: #222; } /* 제목 크기 확대 */
+
+    /* 버튼 크기 확대 */
+    .nav-buttons { display: flex; gap: 15px; }
+    .unified-btn { 
+      padding: 12px 25px; 
+      border-radius: 10px; 
+      border: 1px solid var(--border-orange); 
+      background: var(--bg-orange); 
+      color: var(--accent-color);
+      cursor: pointer; 
+      font-size: 18px; /* 폰트 크기 확대 */
+      font-weight: bold; 
+      font-family: inherit;
+      transition: all 0.2s; 
+    }
+    .unified-btn:hover { background: #fff3db; transform: translateY(-2px); box-shadow: 0 4px 8px rgba(230,81,0,0.15); }
+
+    .layout { display: flex; gap: 25px; }
+
+    /* 좌측 설정 카드 */
+    .box-speed { 
+      flex: 0.3; 
+      background: #f0f7ff; 
+      padding: 30px; 
+      border-radius: 15px; 
+      border: 1px solid #d0e4ff;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05); 
+    }
+    .box-speed h3 { font-size: 22px; margin-bottom: 20px; }
+
+    /* 우측 입력 카드 */
+    .box-script { 
+      flex: 0.7; 
+      background: #fdfdfd; 
+      padding: 30px; 
+      border-radius: 15px; 
+      border: 1px solid #eee;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.08); 
+    }
+
+    textarea { 
+      width: 100%; 
+      height: 450px; 
+      padding: 25px; 
+      border-radius: 12px; 
+      border: 1px solid #ddd; 
+      resize: none; 
+      font-size: 18px; /* 입력창 글자 크기 확대 */
+      font-family: inherit; 
+      box-sizing: border-box;
+      line-height: 1.8;
+      background: #fff;
+    }
+    
+    /* 모달 및 기타 공통 스타일 */
+
+    /* 미니 결과창 스타일 */
+    .result-box-mini { 
+      display: flex; 
+      align-items: center; 
+      gap: 15px; 
+      background: var(--bg-orange); 
+      padding: 10px 25px; 
+      border-radius: 12px; 
+      border: 1px solid var(--border-orange);
+      box-shadow: 0 4px 10px rgba(230,81,0,0.05);
+    }
+    .result-mini-label { font-size: 16px; color: #666; font-weight: bold; }
+    .result-mini-value { font-size: 28px; font-weight: bold; color: var(--accent-color); }
+
+    .count-info { font-size: 16px; color: #555; margin-top: 20px; line-height: 2; }
+    .count-info b { color: #e65100; margin-right: 8px; font-size: 18px; }
+
+    /* 모달 */
+    .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); align-items: center; justify-content: center; }
+    .modal-content { background: white; padding: 30px; border-radius: 20px; text-align: center; position: relative; max-width: 90%; }
+    .close-modal { position: absolute; top: 15px; right: 20px; font-size: 32px; cursor: pointer; color: #999; }
+
+    /* 컨버터 전용 스타일 */
+    .converter-wrap { margin-top: 30px; }
+    #logWindow {
+      background-color: #f8f9fa;
+      color: #2b579a;
+      font-family: monospace;
+      height: 120px;
+      overflow-y: auto;
+      padding: 10px;
+      border-radius: 8px;
+      margin-bottom: 15px;
+      font-size: 13px;
+      white-space: pre-wrap;
+      border: 1px solid #d0e4ff;
+    }
+
+    .drop-zone {
+      border: 2px dashed #b8d4ff;
+      border-radius: 10px;
+      padding: 20px 10px;
+      text-align: center;
+      background: #fdfdfd;
+      cursor: pointer;
+      transition: all 0.3s;
+      margin-bottom: 15px;
+    }
+
+    .drop-zone:hover, .drop-zone.drag-over {
+      border-color: var(--accent-color);
+      background: #fff8ef;
+    }
+
+    .drop-zone p {
+      margin: 0;
+      font-size: 14px;
+      color: #5a7baf;
+    }
+
+    .drop-zone .icon {
+      font-size: 30px;
+      margin-bottom: 5px;
+      display: block;
+    }
+
+
+    /* 쿠팡 배너 스타일 */
+    .coupang-banner-wrap {
+      width: 100%;
+      background-color: #f8f8f7;
+      border-bottom: 1px solid #f5f5f4;
+      padding: 8px 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-bottom: 15px; /* 헤더와의 간격 */
+      border-radius: 12px;
+    }
+    .coupang-banner-wrap a {
+      display: block;
+      max-width: 100%;
+    }
+    .coupang-banner-wrap img {
+      max-width: 100%;
+      height: auto;
+      display: block;
+      margin: 0 auto;
+    }
+    .coupang-notice {
+      font-size: 10px;
+      color: #a8a29e;
+      margin-top: 4px;
+      padding: 0 16px;
+      text-align: center;
+    }
+
+    @media (max-width: 1000px) { 
+      .header-row { flex-direction: column; gap: 20px; }
+      .layout { flex-direction: column; } 
+      .count-box-wrap { flex-direction: column; align-items: flex-start !important; gap: 15px; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <!-- 쿠팡 배너 -->
+    <div class="coupang-banner-wrap">
+      <a href="https://link.coupang.com/a/eqlzU3" target="_blank" rel="noreferrer" referrerpolicy="unsafe-url">
+        <img src="https://ads-partners.coupang.com/banners/981420?subId=&traceId=V0-301-879dd1202e5c73b2-I981420&w=728&h=90" alt="쿠팡 추천 제품">
+      </a>
+      <p class="coupang-notice">
+        이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.
+      </p>
+    </div>
+
+    <header class="header-row">
+      <div class="title-group">
+        <img src="https://store.img11.co.kr/70064898/a320c6fb-b24a-4761-8eac-fed83ceffd80_1762746721708.png" 
+             alt="로고" class="title-logo" onclick="location.reload()">
+        <h1>발표 시간 계산기 & MP3변환기</h1>
+      </div>
+      <div class="nav-buttons">
+        <button class="unified-btn" onclick="window.open('https://cafe.naver.com/pink2dxzb', '_blank')">🏰 카페방문</button>
+        <button class="unified-btn" onclick="openModal()">☕ 커피사주기</button>
+      </div>
+    </header>
+
+    <div class="layout">
+      <div class="box-speed">
+        <h3 style="margin-top:0; color: #2b579a;">🎙 말하기 속도 설정</h3>
+        <input id="speed" type="range" min="50" max="200" value="100" step="10" style="width:100%; cursor: pointer;" />
+        <p style="font-size: 22px;">현재 속도: <strong id="speedValue" style="color: #2b579a;">100%</strong></p>
+        <hr style="border: 0; border-top: 1px solid #d0e4ff; margin: 25px 0;">
+        <div style="font-size: 15px; color: #5a7baf; line-height: 1.8;">
+          <strong>안내:</strong><br>
+          설정된 속도와 글자 수를 기반으로 실시간 계산됩니다.
+        </div>
+
+        <!-- 컨버터 UI 추가 -->
+        <div class="converter-wrap">
+          <hr style="border: 0; border-top: 1px solid #d0e4ff; margin: 25px 0;">
+          <h3 style="margin-top:0; color: #2b579a; font-size: 20px;">📦 WAV to MP3 변환</h3>
+          <div id="logWindow">시스템 준비 중...</div>
+          
+          <div class="drop-zone" id="dropZone">
+              <span class="icon">📂</span>
+              <p>WAV 파일을 드래그하거나 클릭하여 선택하세요</p>
+              <input type="file" id="fileInput" multiple accept=".wav" style="display:none;">
+          </div>
+
+          <button id="convertBtn" class="unified-btn" style="width:100%;" onclick="startProcess()">변환 시작 & ZIP 다운로드</button>
+        </div>
+      </div>
+
+      <div class="box-script">
+        <textarea id="script" placeholder="스크립트를 입력하거나 붙여넣어 주세요..."></textarea>
+        <div class="count-box-wrap" style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px;">
+          <div class="count-info" style="margin-top: 0;">
+            <span>공백 포함: <b id="charWith">0자 / 0byte</b></span> | 
+            <span>공백 미포함: <b id="charWithout">0자 / 0byte</b></span><br>
+            <span>단어수: <b id="words">0개</b></span> | 
+            <span>문장수: <b id="sentences">0개</b></span>
+          </div>
+          <div class="result-box-mini">
+            <div class="result-mini-label">⏱ 예상 발표 시간</div>
+            <div class="result-mini-value" id="timeResult">0초</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="coffeeModal" class="modal" onclick="closeModal()">
+    <div class="modal-content" onclick="event.stopPropagation()">
+      <span class="close-modal" onclick="closeModal()">&times;</span>
+      <h3 style="margin-bottom: 25px; color: var(--accent-color); font-size: 24px;">커피 한 잔의 응원 ☕</h3>
+      <img src="https://store.img11.co.kr/70064898/e9459abf-7937-4289-b479-f8cb197cb71b_1772709289557.png" alt="커피 후원" style="max-width: 100%; border-radius: 10px;">
+    </div>
+  </div>
+
+  <script>
+    const script = document.getElementById("script");
+    const speed = document.getElementById("speed");
+    const speedValue = document.getElementById("speedValue");
+    const charWithEl = document.getElementById("charWith");
+    const charWithoutEl = document.getElementById("charWithout");
+    const wordsEl = document.getElementById("words");
+    const sentenceEl = document.getElementById("sentences");
+    const timeResultEl = document.getElementById("timeResult");
+    const coffeeModal = document.getElementById("coffeeModal");
+
+    const charRateAt100 = 200 / 37; 
+
+    function openModal() { coffeeModal.style.display = 'flex'; }
+    function closeModal() { coffeeModal.style.display = 'none'; }
+    function getByteLength(str) { return new TextEncoder().encode(str).length; }
+
+    function updateCounts() {
+      const text = script.value || "";
+      const textNoSpace = text.replace(/\s+/g, "");
+      
+      charWithEl.textContent = `${text.length}자 / ${getByteLength(text)}byte`;
+      charWithoutEl.textContent = `${textNoSpace.length}자 / ${getByteLength(textNoSpace)}byte`;
+      wordsEl.textContent = `${text.trim() ? text.trim().split(/\s+/).length : 0}개`;
+      
+      const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0).length;
+      sentenceEl.textContent = `${sentences}개`;
+    }
+
+    function calculateTime() {
+      const chars = script.value.replace(/\s+/g, "").length;
+      const speedPercent = Number(speed.value);
+      if (chars === 0) { timeResultEl.textContent = "0초"; return; }
+
+      const seconds = Math.round(chars / (charRateAt100 * (speedPercent / 100)));
+      const m = Math.floor(seconds / 60);
+      const s = seconds % 60;
+      timeResultEl.textContent = m > 0 ? `${m}분 ${s}초` : `${s}초`;
+    }
+
+    script.addEventListener("input", () => { updateCounts(); calculateTime(); });
+    speed.addEventListener("input", () => { 
+      speedValue.textContent = speed.value + "%"; 
+      calculateTime(); 
+    });
+
+    // --- 컨버터 스크립트 시작 ---
+    const logWindow = document.getElementById('logWindow');
+    const convertBtn = document.getElementById('convertBtn');
+    const fileInput = document.getElementById('fileInput');
+    const dropZone = document.getElementById('dropZone');
+
+    function log(msg) {
+        const div = document.createElement('div');
+        div.innerText = msg;
+        logWindow.appendChild(div);
+        logWindow.scrollTop = logWindow.scrollHeight;
+    }
+
+    // 초기화 및 라이브러리 체크
+    function initConverter() {
+        log("=== 시스템 점검 ===");
+        if (typeof lamejs === 'undefined') log("❌ 오류: MP3 인코더를 불러오지 못했습니다.");
+        else log("✅ MP3 인코더 로드됨");
+
+        if (typeof JSZip === 'undefined') log("❌ 오류: 압축 라이브러리를 불러오지 못했습니다.");
+        else log("✅ 압축 라이브러리 로드됨");
+
+        if (typeof lamejs !== 'undefined' && typeof JSZip !== 'undefined') {
+            log("=== 준비 완료: 파일을 업로드하세요 ===");
+        } else {
+            convertBtn.disabled = true;
+            log("⚠️ 라이브러리 로드 오류로 사용 불가");
+        }
+    }
+
+    window.addEventListener('load', initConverter);
+
+    // 드래그 앤 드롭 이벤트
+    dropZone.addEventListener('click', () => fileInput.click());
+
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('drag-over');
+    });
+
+    ['dragleave', 'dragend'].forEach(type => {
+        dropZone.addEventListener(type, () => {
+            dropZone.classList.remove('drag-over');
+        });
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+            fileInput.files = files;
+            log(`\n📥 ${files.length}개의 파일 선택됨`);
+            updateDropZoneText(files);
+        }
+    });
+
+    fileInput.addEventListener('change', () => {
+        if (fileInput.files.length > 0) {
+            log(`\n📥 ${fileInput.files.length}개의 파일 선택됨`);
+            updateDropZoneText(fileInput.files);
+        }
+    });
+
+    function updateDropZoneText(files) {
+        const p = dropZone.querySelector('p');
+        p.innerText = files.length === 1 ? files[0].name : `${files.length}개의 파일 선택됨`;
+    }
+
+    async function startProcess() {
+        const files = fileInput.files;
+        if (files.length === 0) { alert("파일을 선택해주세요."); return; }
+
+        convertBtn.disabled = true;
+        log("\n🚀 작업 시작...");
+
+        const zip = new JSZip();
+        let successCount = 0;
+        let lastBlob = null;
+        let lastFileName = "";
+
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            log(`[${i + 1}/${files.length}] 변환 중: ${file.name}`);
+
+            try {
+                if (!file.name.toLowerCase().endsWith('.wav') && file.type !== 'audio/wav') {
+                    throw new Error("WAV 파일 아님");
+                }
+
+                const arrayBuffer = await file.arrayBuffer();
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+
+                const mp3Data = encodeToMp3(audioBuffer);
+                const newFileName = file.name.replace(/\.wav$/i, '.mp3');
+                const blob = new Blob(mp3Data, { type: 'audio/mp3' });
+
+                if (files.length > 1) {
+                    zip.file(newFileName, blob);
+                } else {
+                    lastBlob = blob;
+                    lastFileName = newFileName;
+                }
+                successCount++;
+                log(`✅ 성공: ${newFileName}`);
+
+            } catch (err) {
+                log(`❌ 실패: ${file.name} / ${err.message}`);
+            }
+            await new Promise(r => setTimeout(r, 50));
+        }
+
+        if (successCount > 0) {
+            if (files.length > 1) {
+                log("\n📦 ZIP 생성 중...");
+                const content = await zip.generateAsync({ type: "blob" });
+                downloadFile(content, "변환된_MP3_파일들.zip");
+            } else if (lastBlob) {
+                downloadFile(lastBlob, lastFileName);
+            }
+            log("=== 작업 완료 ===");
+        }
+        convertBtn.disabled = false;
+    }
+
+    function downloadFile(blob, fileName) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    function encodeToMp3(audioBuffer) {
+        const channels = audioBuffer.numberOfChannels;
+        const sampleRate = audioBuffer.sampleRate;
+        const mp3encoder = new lamejs.Mp3Encoder(channels, sampleRate, 128);
+        const samplesLeft = audioBuffer.getChannelData(0);
+        const samplesRight = channels > 1 ? audioBuffer.getChannelData(1) : samplesLeft;
+        const sampleBlockSize = 1152;
+        const mp3Data = [];
+        const leftData = new Int16Array(samplesLeft.length);
+        const rightData = new Int16Array(samplesRight.length);
+
+        for (let i = 0; i < samplesLeft.length; i++) {
+            let l = samplesLeft[i], r = samplesRight[i];
+            l = Math.max(-1, Math.min(1, l));
+            r = Math.max(-1, Math.min(1, r));
+            leftData[i] = l < 0 ? l * 0x8000 : l * 0x7FFF;
+            rightData[i] = r < 0 ? r * 0x8000 : r * 0x7FFF;
+        }
+
+        for (let i = 0; i < leftData.length; i += sampleBlockSize) {
+            const leftChunk = leftData.subarray(i, i + sampleBlockSize);
+            const rightChunk = rightData.subarray(i, i + sampleBlockSize);
+            const mp3buf = (channels === 1) ? mp3encoder.encodeBuffer(leftChunk) : mp3encoder.encodeBuffer(leftChunk, rightChunk);
+            if (mp3buf.length > 0) mp3Data.push(mp3buf);
+        }
+        const mp3buf = mp3encoder.flush();
+        if (mp3buf.length > 0) mp3Data.push(mp3buf);
+        return mp3Data;
+    }
+    // --- 컨버터 스크립트 끝 ---
+  </script>
+</body>
+</html>
